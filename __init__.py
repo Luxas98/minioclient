@@ -1,16 +1,20 @@
 import os
 from minio import Minio
-from minio.error import (ResponseError, BucketAlreadyOwnedByYou, BucketAlreadyExists)
+from minio.error import (ResponseError, BucketAlreadyOwnedByYou,
+                         BucketAlreadyExists)
 
-from gcloudlogging.logger import create_logger
-from time import sleep, time
+try:
+    from gcloudlogging.logger import create_logger
+
+    log = create_logger()
+except ImportError:
+    import logging
+
+    log = logging.getLogger()
 
 minio_host = os.environ.get('MINIO_HOST')
 minion_access_key = os.environ.get('MINIO_ACCESS_KEY', "minioadmin")
 minion_secret_key = os.environ.get('MINIO_SECRET_KEY', "minioadmin")
-
-DEBUG = os.environ.get('DEBUG', False)
-log = create_logger()
 
 
 def _get_storage_client():
@@ -18,22 +22,24 @@ def _get_storage_client():
         return _get_storage_client.client
 
     _get_storage_client.client = Minio(minio_host, access_key=minion_access_key,
-                                       secret_key=minion_secret_key, secure=False)
+                                       secret_key=minion_secret_key,
+                                       secure=False)
     return _get_storage_client.client
 
 
 def upload_file(file_stream, filename, app_name, metadata, compress=False):
-    if DEBUG:
-        start = time()
-    log.info(f'Uploading file {filename} to {app_name}', extra={'_filename': filename, 'app': app_name})
+    log.info(f'Uploading file {filename} to {app_name}',
+             extra={'_filename': filename, 'app': app_name})
 
     client = _get_storage_client()
 
     stream_length = file_stream.getbuffer().nbytes
     result = ""
     try:
-        result = client.put_object(app_name, filename, file_stream, stream_length,
-                                   content_type="application/octet-stream", metadata=metadata)
+        result = client.put_object(app_name, filename, file_stream,
+                                   stream_length,
+                                   content_type="application/octet-stream",
+                                   metadata=metadata)
     except ResponseError as e:
         log.error(e, extra={'_filename': filename, 'app': app_name})
 
@@ -48,7 +54,8 @@ def list_all_files(user_id, folder, app_name):
 
 
 def list_files(user_id, folder, app_name):
-    return [f.object_name.encode('utf-8') for f in list_all_files(user_id, folder, app_name)]
+    return [f.object_name.encode('utf-8') for f in
+            list_all_files(user_id, folder, app_name)]
 
 
 def get_file(filename, appname):
